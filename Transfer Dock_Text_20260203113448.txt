@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Battle Royale Demo</title>
+  <style>
+    body { margin:0; font-family: Arial; background:#111; color:white; overflow:hidden; }
+    canvas { background:#222; display:block; margin:auto; border:2px solid #0f0; }
+    button { font-size:16px; padding:10px; margin:2px; cursor:pointer; border-radius:10px; }
+    #hud button{ width:60px; height:60px; margin:5px; }
+    #hud div{ position:absolute; }
+  </style>
+</head>
+<body>
+
+<h2 style="text-align:center;">🔫 Mini Battle Royale Demo</h2>
+<canvas id="game" width="400" height="500"></canvas>
+
+<!-- HUD / Buttons -->
+<div id="hud">
+  <!-- Top Status -->
+  <div id="status-bar" style="top:5px; left:5px;">
+    💰<span id="coins">0</span> | 💎<span id="diamonds">0</span> | ❤️<span id="health">100</span>
+  </div>
+
+  <!-- Right Side Buttons -->
+  <div id="right-buttons" style="right:10px; bottom:50px;">
+    <button onclick="shoot()">🔫</button>
+    <button onclick="useMedkit()">💊</button>
+    <button onclick="openInventory()">🎁</button>
+    <button onclick="openShop()">💎</button>
+  </div>
+
+  <!-- Left Side Buttons -->
+  <div id="left-buttons" style="left:10px; bottom:50px;">
+    <button onclick="moveLeft()">⬅️</button>
+    <button onclick="moveRight()">➡️</button>
+    <button onclick="jump()">⏫</button>
+  </div>
+
+  <!-- Bottom Menu -->
+  <div id="bottom-menu" style="bottom:5px; left:50%; transform:translateX(-50%);">
+    <button onclick="inviteFriend()">👥 Invite</button>
+    <button onclick="showRewards()">🎁 Rewards</button>
+    <button onclick="openRank()">🏆 Rank</button>
+    <button onclick="openGuild()">🛡️ Guild</button>
+  </div>
+</div>
+
+<p style="text-align:center;">Controls: Arrow Left/Right = Move, SPACE = Shoot, R = Revive (ad)</p>
+
+<script>
+// ===================== OWNER MODE =====================
+const OWNER_ID = "OWNER123";
+let playerID = localStorage.getItem("playerID");
+if(!playerID){
+  playerID = prompt("Enter your Player ID:");
+  localStorage.setItem("playerID", playerID);
+}
+let isOwner = (playerID === OWNER_ID);
+
+// ------------------- GAME VARIABLES -------------------
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+
+let player = { x:180, y:450, w:40, h:40, alive:true, health:100 };
+let bullets = [];
+let enemies = [];
+let coins = Number(localStorage.getItem("coins")) || 0;
+let diamonds = Number(localStorage.getItem("diamonds")) || 0;
+
+// OWNER MODE FREE RESOURCES
+if(isOwner){
+  coins = 999999;
+  diamonds = 99999;
+  player.health = 100;
+  localStorage.setItem("coins", coins);
+  localStorage.setItem("diamonds", diamonds);
+  alert("👑 OWNER MODE ACTIVE\nAll items unlocked for FREE!");
+}
+
+// ------------------- HUD / STATUS -------------------
+function showStatus(){
+  document.getElementById("coins").innerText = coins;
+  document.getElementById("diamonds").innerText = diamonds;
+  document.getElementById("health").innerText = player.health;
+}
+showStatus();
+
+// ------------------- FRIEND INVITE -------------------
+function inviteFriend(){
+  const friendCode = prompt("Enter friend code to invite:");
+  if(friendCode){
+    if(!localStorage.getItem("inviteUsed_"+friendCode)){
+      localStorage.setItem("inviteUsed_"+friendCode,"true");
+      let rewardDiamonds = isOwner ? 999 : 2;
+      let rewardCoins = isOwner ? 9999 : 50;
+      diamonds += rewardDiamonds;
+      coins += rewardCoins;
+      localStorage.setItem("coins", coins);
+      localStorage.setItem("diamonds", diamonds);
+      alert(`🎉 Invite successful! ${rewardDiamonds} Diamonds & ${rewardCoins} Coins awarded.`);
+      showStatus();
+    } else alert("This friend code already used.");
+  }
+}
+
+// ------------------- BUTTON FUNCTIONS -------------------
+function moveLeft(){ if(player.alive) player.x = Math.max(0, player.x-20); }
+function moveRight(){ if(player.alive) player.x = Math.min(360, player.x+20); }
+function jump(){ 
+  if(player.alive){ 
+    player.y -= 50; 
+    setTimeout(()=>{ player.y += 50; }, 300);
+  }
+}
+function shoot(){ if(player.alive) bullets.push({x:player.x+18, y:player.y}); }
+function useMedkit(){ if(player.alive && player.health<100){ player.health=100; showStatus(); alert("💊 Health Restored"); } }
+function openInventory(){ alert("🎁 Inventory opened"); }
+function openShop(){ alert("💎 Shop opened"); }
+function openRank(){ alert("🏆 Rank screen"); }
+function openGuild(){ alert("🛡️ Guild screen"); }
+
+// ------------------- CONTROLS -------------------
+document.addEventListener("keydown", e => {
+  if(e.key==="ArrowLeft") moveLeft();
+  if(e.key==="ArrowRight") moveRight();
+  if(e.code==="Space") shoot();
+  if(e.key==="r" && !player.alive) reviveWithAd();
+});
+
+// ------------------- SPAWN ENEMIES -------------------
+function spawnEnemy(){ if(player.alive) enemies.push({x:Math.random()*360, y:0, w:40, h:40}); }
+setInterval(spawnEnemy,1000);
+
+// ------------------- GAME LOOP -------------------
+let gameRunning = false;
+function gameLoop(){
+  ctx.clearRect(0,0,400,500);
+
+  // Player
+  if(player.alive){
+    ctx.fillStyle="lime";
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+  }
+
+  // Bullets
+  ctx.fillStyle="yellow";
+  bullets.forEach((b,i)=>{
+    b.y -= 8;
+    ctx.fillRect(b.x,b.y,4,10);
+    if(b.y<0) bullets.splice(i,1);
+  });
+
+  // Enemies
+  ctx.fillStyle="red";
+  enemies.forEach((e,i)=>{
+    e.y += 3;
+    ctx.fillRect(e.x,e.y,e.w,e.h);
+    if(player.alive && e.x < player.x+player.w && e.x+e.w > player.x && e.y+e.h > player.y && e.y < player.y+player.h){
+      player.alive = false;
+      alert("💀 You died! Press R to revive with ad bonus.");
+    }
+  });
+
+  if(gameRunning) requestAnimationFrame(gameLoop);
+}
+
+// ------------------- START GAME -------------------
+function startGame(){
+  if(!gameRunning){
+    player.alive = true;
+    player.health = 100;
+    bullets = [];
+    enemies = [];
+    gameRunning = true;
+    gameLoop();
+  }
+}
+
+// ------------------- AD REVIVE / BONUS -------------------
+function reviveWithAd(){
+  if(!player.alive){
+    player.alive = true;
+    player.health = 100;
+    let reviveCoins = isOwner ? 9999 : 100;
+    let reviveDiamonds = isOwner ? 999 : 1;
+    coins += reviveCoins;
+    diamonds += reviveDiamonds;
+    localStorage.setItem("coins", coins);
+    localStorage.setItem("diamonds", diamonds);
+    showStatus();
+    alert(`💎 Revived! ${reviveCoins} Coins & ${reviveDiamonds} Diamond added.`);
+  }
+}
+</script>
+</body>
+</html>
